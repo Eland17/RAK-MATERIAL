@@ -110,7 +110,11 @@
             <section>
                 <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
                     <div>
-                        
+                        <h2 class="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i data-lucide="layout-grid" class="w-5 h-5 text-indigo-600"></i>
+                            Tata Letak Kompartemen Rak Gudang
+                        </h2>
+                        <p class="text-xs text-slate-500">Centang kotak pada kartu untuk memilih barcode lokasi yang ingin dicetak.</p>
                     </div>
                     <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end text-xs">
                         <button onclick="toggleSelectAll(true)" class="text-indigo-600 hover:text-indigo-800 font-semibold underline">Pilih Semua</button>
@@ -121,20 +125,25 @@
                     </div>
                 </div>
 
-                <!-- Layout Grid Cards (Max 9 per page) -->
+                <!-- Layout Grid Cards (3x3 di desktop = 9 item per halaman) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5" id="rackGrid">
-                    <!-- Rack Compartments rendered by JS -->
+                    <!-- Dynamic Rack Cards -->
                 </div>
 
-                <!-- Pagination Controls -->
-                <div class="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
-                    <button onclick="changePage(-1)" id="prevPageBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-                        <i data-lucide="chevron-left" class="w-4 h-4"><span>Sebelumnya</span></i>
-                    </button>
-                    <span id="pageInfoText" class="text-xs font-bold text-slate-600">Halaman 1 dari 1</span>
-                    <button onclick="changePage(1)" id="nextPageBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-                        <span>Berikutnya</span><i data-lucide="chevron-right" class="w-4 h-4"></i>
-                    </button>
+                <!-- Desktop Pagination Control (Sembunyi di Mobile) -->
+                <div id="desktopPagination" class="hidden sm:flex items-center justify-between bg-white px-5 py-3 rounded-2xl border border-slate-200 mt-6 shadow-sm">
+                    <span class="text-xs font-semibold text-slate-500" id="pageInfoText">Halaman 1 dari 1 (Total 9 Rak)</span>
+                    <div class="flex items-center gap-2">
+                        <button id="prevPageBtn" onclick="changePage(-1)" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1">
+                            <i data-lucide="chevron-left" class="w-4 h-4"></i> Sebelumnya
+                        </button>
+                        <div id="pageNumbersContainer" class="flex items-center gap-1">
+                            <!-- Dynamic Page Buttons -->
+                        </div>
+                        <button id="nextPageBtn" onclick="changePage(1)" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1">
+                            Selanjutnya <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </button>
+                    </div>
                 </div>
             </section>
         </div>
@@ -346,8 +355,8 @@
 
     <!-- Application Script Logic -->
     <script>
-        // Initial Data Structure (12 racks total across 2 pages)
-        const defaultRackData = Array.from({ length: 12 }, (_, index) => {
+        // Initial Data Structure
+        const defaultRackData = Array.from({ length: 18 }, (_, index) => {
             const locNum = String(index + 1).padStart(2, '0');
             const locCode = `LOC-${locNum}`;
             
@@ -381,8 +390,8 @@
         });
 
         // App State
-        let rackData = JSON.parse(localStorage.getItem('materialRackDataPaging')) || defaultRackData;
-        let historyData = JSON.parse(localStorage.getItem('materialRackHistoryPaging')) || [];
+        let rackData = JSON.parse(localStorage.getItem('materialRackDataCam')) || defaultRackData;
+        let historyData = JSON.parse(localStorage.getItem('materialRackHistoryCam')) || [];
         let activeCompartmentId = null;
         let html5QrCodeScanner = null;
 
@@ -425,8 +434,8 @@
 
         // Save State to LocalStorage
         function saveData() {
-            localStorage.setItem('materialRackDataPaging', JSON.stringify(rackData));
-            localStorage.setItem('materialRackHistoryPaging', JSON.stringify(historyData));
+            localStorage.setItem('materialRackDataCam', JSON.stringify(rackData));
+            localStorage.setItem('materialRackHistoryCam', JSON.stringify(historyData));
             renderRackGrid();
             renderHistoryTable();
             updateSelectedCount();
@@ -446,30 +455,11 @@
                 items: []
             });
 
-            // Otomatis pindah ke halaman terakhir tempat rak baru berada
-            currentPage = Math.ceil(rackData.length / itemsPerPage);
+            // Otomatis pindah ke halaman tempat rak baru ditambahkan jika di desktop
+            const totalPages = Math.ceil(rackData.length / itemsPerPage);
+            currentPage = totalPages;
+
             saveData();
-        }
-
-        // Pagination Control
-        function changePage(direction) {
-            const searchQuery = document.getElementById('searchInput').value.toUpperCase().trim();
-            let filteredData = rackData;
-            if (searchQuery !== '') {
-                filteredData = rackData.filter(comp => {
-                    const matchesLoc = comp.locCode.includes(searchQuery);
-                    const matchesItem = comp.items.some(i => i.name.toUpperCase().includes(searchQuery));
-                    return matchesLoc || matchesItem;
-                });
-            }
-
-            const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
-            currentPage += direction;
-
-            if (currentPage < 1) currentPage = 1;
-            if (currentPage > totalPages) currentPage = totalPages;
-
-            renderRackGrid();
         }
 
         // Toggle Single Selection
@@ -481,7 +471,7 @@
             }
         }
 
-        // Toggle Select All / None (Seluruh data)
+        // Toggle Select All / None
         function toggleSelectAll(selectState) {
             rackData.forEach(comp => {
                 comp.selected = selectState;
@@ -496,40 +486,37 @@
             if (badge) badge.innerText = count;
         }
 
-        // Render Rack Cards Grid with Pagination
+        // Render Rack Cards Grid dengan Paginasi 9 per Halaman di Desktop
         function renderRackGrid() {
             const container = document.getElementById('rackGrid');
             container.innerHTML = '';
 
-            const searchQuery = document.getElementById('searchInput').value.toUpperCase().trim();
-            let filteredData = rackData;
+            const isMobile = window.innerWidth < 640;
+            const query = document.getElementById('searchInput') ? document.getElementById('searchInput').value.toUpperCase().trim() : '';
 
-            if (searchQuery !== '') {
-                filteredData = rackData.filter(comp => {
-                    const matchesLoc = comp.locCode.includes(searchQuery);
-                    const matchesItem = comp.items.some(i => i.name.toUpperCase().includes(searchQuery));
-                    return matchesLoc || matchesItem;
-                });
+            // Saring rak berdasarkan keyword pencarian
+            let filteredRacks = rackData.filter(comp => {
+                if (query === '') return true;
+                const matchesLoc = comp.locCode.includes(query);
+                const matchesItem = comp.items.some(i => i.name.toUpperCase().includes(query));
+                return matchesLoc || matchesItem;
+            });
+
+            // Tentukan rak mana yang akan ditampilkan (Mobile: Semua, Desktop: 9 per halaman)
+            let displayRacks = filteredRacks;
+            const totalPages = Math.max(1, Math.ceil(filteredRacks.length / itemsPerPage));
+
+            if (!isMobile && query === '') {
+                if (currentPage > totalPages) currentPage = totalPages;
+                const startIdx = (currentPage - 1) * itemsPerPage;
+                displayRacks = filteredRacks.slice(startIdx, startIdx + itemsPerPage);
+                renderPaginationControls(filteredRacks.length, totalPages);
+            } else {
+                const pagContainer = document.getElementById('desktopPagination');
+                if (pagContainer) pagContainer.classList.add('hidden');
             }
 
-            const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
-            if (currentPage > totalPages) currentPage = totalPages;
-
-            // Slice data untuk halaman aktif (9 per halaman)
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
-
-            // Update info teks halaman
-            document.getElementById('pageInfoText').innerText = `Halaman ${currentPage} dari ${totalPages} (Total ${filteredData.length} Rak)`;
-            document.getElementById('prevPageBtn').disabled = (currentPage <= 1);
-            document.getElementById('nextPageBtn').disabled = (currentPage >= totalPages);
-
-            if (paginatedData.length === 0) {
-                container.innerHTML = `<div class="col-span-3 text-center py-12 text-slate-400 text-sm italic bg-white rounded-2xl border border-slate-200">Tidak ada kompartemen rak yang ditemukan.</div>`;
-                return;
-            }
-
-            paginatedData.forEach(comp => {
+            displayRacks.forEach(comp => {
                 const totalQty = comp.items.reduce((sum, item) => sum + item.values.reduce((a, b) => a + Number(b), 0), 0);
                 const itemCount = comp.items.length;
 
@@ -612,6 +599,43 @@
 
             lucide.createIcons();
         }
+
+        // Render Control Tombol Paginasi Desktop
+        function renderPaginationControls(totalItems, totalPages) {
+            const pagContainer = document.getElementById('desktopPagination');
+            const pageInfo = document.getElementById('pageInfoText');
+            const prevBtn = document.getElementById('prevPageBtn');
+            const nextBtn = document.getElementById('nextPageBtn');
+            const numbersContainer = document.getElementById('pageNumbersContainer');
+
+            if (!pagContainer) return;
+
+            pagContainer.classList.remove('hidden');
+            pageInfo.innerText = `Halaman ${currentPage} dari ${totalPages} (Total ${totalItems} Rak)`;
+
+            prevBtn.disabled = currentPage === 1;
+            nextBtn.disabled = currentPage === totalPages;
+
+            numbersContainer.innerHTML = '';
+            for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement('button');
+                btn.onclick = () => { currentPage = i; renderRackGrid(); };
+                btn.innerText = i;
+                btn.className = `w-7 h-7 rounded-lg text-xs font-bold transition ${i === currentPage ? 'bg-indigo-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`;
+                numbersContainer.appendChild(btn);
+            }
+        }
+
+        function changePage(delta) {
+            currentPage += delta;
+            renderRackGrid();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Handle Responsive Window Resize
+        window.addEventListener('resize', () => {
+            renderRackGrid();
+        });
 
         // Open Compartment Edit Modal
         function openEditModal(compID) {
@@ -957,7 +981,7 @@
 
         // Search / Barcode Scanner Handler
         function handleSearch() {
-            currentPage = 1; // Reset ke halaman 1 saat mencari
+            currentPage = 1;
             renderRackGrid();
         }
 
@@ -975,7 +999,7 @@
             input.focus();
         }
 
-        // --- CAMERA SCANNER FUNCTIONS ---
+        // Camera Scanner Functions
         function openScannerModal() {
             document.getElementById('scannerModal').classList.remove('hidden');
             
@@ -993,7 +1017,9 @@
                     handleSearch();
                     closeScannerModal();
                 },
-                (errorMessage) => {}
+                (errorMessage) => {
+                    // Scanning errors ignored during active scan
+                }
             ).catch(err => {
                 console.error("Gagal membuka kamera:", err);
                 alert("Tidak dapat mengakses kamera. Pastikan izin kamera diizinkan oleh browser.");
@@ -1048,8 +1074,8 @@
 
         function resetData() {
             if (confirm('Kembalikan data ke pengaturan awal?')) {
-                localStorage.removeItem('materialRackDataPaging');
-                localStorage.removeItem('materialRackHistoryPaging');
+                localStorage.removeItem('materialRackDataCam');
+                localStorage.removeItem('materialRackHistoryCam');
                 rackData = defaultRackData;
                 historyData = [];
                 currentPage = 1;
