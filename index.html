@@ -644,9 +644,9 @@
                     const itemTotal = item.values.reduce((a, b) => a + Number(b), 0);
                     const cellCount = item.values.length;
                     return `
-                        <div class="flex items-center justify-between text-xs py-1 border-b border-slate-100 last:border-0 gap-2">
-                            <span class="text-slate-700 font-medium truncate max-w-[130px]" title="${item.name}">${item.name}</span>
-                            <div class="flex items-center gap-1.5">
+                        <div class="flex items-start justify-between text-xs py-1.5 border-b border-slate-100 last:border-0 gap-2">
+                            <span class="text-slate-700 font-medium flex-1 min-w-0 whitespace-normal break-words leading-4" title="${item.name}">${item.name}</span>
+                            <div class="flex items-center gap-1.5 flex-shrink-0">
                                 <span class="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-mono" title="${cellCount} Kotak Sub-kolom">(${cellCount})</span>
                                 <span class="font-bold text-slate-800 bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">${itemTotal}</span>
                             </div>
@@ -677,7 +677,7 @@
                         <!-- Material Items Summary -->
                         <div class="bg-white rounded-lg p-2 border border-slate-100 flex-1">
                             <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Isi Material & Kotak:</div>
-                            <div class="max-h-28 overflow-y-auto pr-1">
+                            <div class="max-h-40 overflow-y-auto overflow-x-hidden pr-1">
                                 ${itemsListHtml}
                             </div>
                         </div>
