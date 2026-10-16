@@ -172,6 +172,25 @@
                     </div>
                 </div>
 
+                <!-- Pencarian Riwayat Mutasi -->
+                <div class="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                    <div class="lg:col-span-2">
+                        <label for="historySearchInput" class="block text-xs font-semibold text-slate-600 mb-1">Cari Riwayat Mutasi</label>
+                        <input id="historySearchInput" type="search" oninput="renderHistoryTable()" placeholder="Cari nama material, kode rak, keterangan..." class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label for="historyTypeFilter" class="block text-xs font-semibold text-slate-600 mb-1">Jenis Transaksi</label>
+                        <select id="historyTypeFilter" onchange="renderHistoryTable()" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="">Semua Transaksi</option>
+                            <option value="Masuk">Barang Masuk</option>
+                            <option value="Keluar">Pengeluaran</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button type="button" onclick="clearHistorySearch()" class="w-full px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold">Reset Pencarian</button>
+                    </div>
+                </div>
+                <div id="historySearchSummary" class="text-xs text-slate-500 mb-3"></div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs sm:text-sm">
                         <thead>
@@ -1246,28 +1265,58 @@
         function renderHistoryTable() {
             const tbody = document.getElementById('historyTableBody');
             const historyBadge = document.getElementById('historyTabBadge');
-            
+            const searchInput = document.getElementById('historySearchInput');
+            const typeFilter = document.getElementById('historyTypeFilter');
+            const query = searchInput ? searchInput.value.trim().toLocaleLowerCase('id-ID') : '';
+            const selectedType = typeFilter ? typeFilter.value : '';
+
             if (historyBadge) historyBadge.innerText = historyData.length;
             tbody.innerHTML = '';
 
-            if (historyData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-400 text-xs italic">Belum ada riwayat transaksi material.</td></tr>`;
+            const filteredHistory = historyData.filter(log => {
+                const type = log.type || 'Keluar';
+                const searchable = [
+                    log.time, log.locCode, log.itemName, type, log.qty, log.note
+                ].map(value => String(value ?? '')).join(' ').toLocaleLowerCase('id-ID');
+                return (!query || searchable.includes(query)) &&
+                    (!selectedType || type === selectedType);
+            });
+
+            const summary = document.getElementById('historySearchSummary');
+            if (summary) summary.textContent = `Menampilkan ${filteredHistory.length} dari ${historyData.length} transaksi`;
+
+            if (filteredHistory.length === 0) {
+                const message = historyData.length === 0
+                    ? 'Belum ada riwayat transaksi material.'
+                    : 'Tidak ada riwayat yang cocok dengan pencarian.';
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-400 text-xs italic">${message}</td></tr>`;
                 return;
             }
 
-            historyData.forEach(log => {
+            filteredHistory.forEach(log => {
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50 transition";
+                const type = log.type || 'Keluar';
+                const typeClass = type === 'Masuk' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600';
                 tr.innerHTML = `
-                    <td class="py-3 px-4 text-slate-500 text-xs whitespace-nowrap">${log.time}</td>
-                    <td class="py-3 px-4 font-bold text-slate-800 text-xs">${log.locCode}</td>
-                    <td class="py-3 px-4 text-slate-800 text-xs font-medium">${log.itemName}</td>
-                    <td class="py-3 px-4 text-center"><span class="${log.type === 'Masuk' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'} font-bold text-xs px-2.5 py-0.5 rounded-full">${log.type || 'Keluar'}</span></td>
-                    <td class="py-3 px-4 text-center"><span class="${log.type === 'Masuk' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'} font-bold text-xs px-2.5 py-0.5 rounded-full">${log.type === 'Masuk' ? '+' : '-'}${log.qty}</span></td>
-                    <td class="py-3 px-4 text-slate-500 text-xs">${log.note}</td>
+                    <td class="py-3 px-4 text-slate-500 text-xs whitespace-nowrap">${log.time || '-'}</td>
+                    <td class="py-3 px-4 font-bold text-slate-800 text-xs">${log.locCode || '-'}</td>
+                    <td class="py-3 px-4 text-slate-800 text-xs font-medium">${log.itemName || '-'}</td>
+                    <td class="py-3 px-4 text-center"><span class="${typeClass} font-bold text-xs px-2.5 py-0.5 rounded-full">${type}</span></td>
+                    <td class="py-3 px-4 text-center"><span class="${typeClass} font-bold text-xs px-2.5 py-0.5 rounded-full">${type === 'Masuk' ? '+' : '-'}${log.qty ?? 0}</span></td>
+                    <td class="py-3 px-4 text-slate-500 text-xs">${log.note || '-'}</td>
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        function clearHistorySearch() {
+            const searchInput = document.getElementById('historySearchInput');
+            const typeFilter = document.getElementById('historyTypeFilter');
+            if (searchInput) searchInput.value = '';
+            if (typeFilter) typeFilter.value = '';
+            renderHistoryTable();
+            if (searchInput) searchInput.focus();
         }
 
         function clearHistory() {
