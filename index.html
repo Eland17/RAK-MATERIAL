@@ -856,6 +856,9 @@
                         <input type="text" value="${item.name}" onchange="updateItemName('${item.id}', this.value)" class="font-bold text-slate-800 text-xs sm:text-sm w-full bg-transparent border-b border-dashed border-slate-300 focus:border-indigo-500 focus:outline-none py-0.5" placeholder="Nama Material...">
                         <div class="flex items-center gap-2 whitespace-nowrap">
                             <span class="text-xs font-semibold text-slate-500">Total: <strong class="text-indigo-600">${totalItemQty}</strong></span>
+                            <button onclick="moveItemToRack('${item.id}')" class="text-blue-600 hover:text-blue-800 p-1 transition" title="Pindahkan ke rak lain">
+                                <i data-lucide="arrow-right-left" class="w-4 h-4"></i>
+                            </button>
                             <button onclick="deleteItem('${item.id}')" class="text-red-400 hover:text-red-600 p-1 transition" title="Hapus Material">
                                 <i data-lucide="trash-2" class="w-4 h-4"></i>
                             </button>
@@ -963,6 +966,47 @@
             comp.items = comp.items.filter(i => i.id !== itemId);
             saveData();
             renderModalMaterialList(comp);
+        }
+
+        // Pindahkan seluruh material beserta rincian kotaknya ke rak lain
+        function moveItemToRack(itemId) {
+            const source = rackData.find(r => r.id === activeCompartmentId);
+            if (!source) return;
+            const itemIndex = source.items.findIndex(i => i.id === itemId);
+            if (itemIndex < 0) return;
+            const item = source.items[itemIndex];
+            const destinations = rackData.filter(r => r.id !== source.id);
+            if (!destinations.length) {
+                alert('Belum ada rak tujuan. Tambahkan rak terlebih dahulu.');
+                return;
+            }
+
+            const choices = destinations.map(r => `${r.locCode} (Rak #${r.id})`).join('\n');
+            const targetCode = prompt(
+                `Pindahkan seluruh material "${item.name}" dari ${source.locCode}.\n` +
+                `Stok: ${item.values.reduce((sum, value) => sum + (Number(value) || 0), 0)} unit\n\n` +
+                `Ketik kode rak tujuan persis seperti di bawah ini:\n${choices}`
+            );
+            if (targetCode === null) return;
+            const target = destinations.find(r => r.locCode.toLowerCase() === targetCode.trim().toLowerCase());
+            if (!target) {
+                alert('Kode rak tujuan tidak ditemukan. Pastikan penulisan kode rak benar.');
+                return;
+            }
+            if (!confirm(`Pindahkan seluruh material "${item.name}" dari ${source.locCode} ke ${target.locCode}?`)) return;
+
+            const movedItem = { ...item, values: [...item.values] };
+            const existing = target.items.find(i => i.name.trim().toLowerCase() === movedItem.name.trim().toLowerCase());
+            if (existing) {
+                // Gabungkan rincian kotak ke material bernama sama di rak tujuan
+                existing.values = [...existing.values, ...movedItem.values];
+            } else {
+                target.items.push(movedItem);
+            }
+            source.items.splice(itemIndex, 1);
+            saveData();
+            renderModalMaterialList(source);
+            alert(`Material berhasil dipindahkan ke ${target.locCode}.`);
         }
 
         // Stock Out / Pengeluaran Workflow
