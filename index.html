@@ -10,6 +10,9 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <!-- HTML5-QRCode Scanner CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <!-- Firebase SDK (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -396,11 +399,99 @@
             };
         });
 
-        // App State
+        // FIREBASE CONFIG: ganti nilai placeholder dengan konfigurasi Web App dari Firebase Console.
+        const firebaseConfig = {
+            apiKey: "AIzaSyACOluEhfPw4JBlBaHyXtf1k3TIJAHikKo",
+            authDomain: "inventory-gudang-16dfe.firebaseapp.com",
+            projectId: "inventory-gudang-16dfe",
+            storageBucket: "inventory-gudang-16dfe.appspot.com",
+            messagingSenderId: "663364522026",
+            appId: "1:663364522026:web:f48fb1ba0331695de83353"
+        };
+
+        let db = null;
+        let firebaseReady = false;
+        let isLoadingFromFirebase = false;
+
+        // Saat Firebase belum dikonfigurasi, data lokal tetap ditampilkan sebagai fallback.
         let rackData = JSON.parse(localStorage.getItem('materialRackDataCamV2')) || defaultRackData;
         let historyData = JSON.parse(localStorage.getItem('materialRackHistoryCamV2')) || [];
         let activeCompartmentId = null;
         let html5QrCodeScanner = null;
+
+        function setFirebaseStatus(message, isError = false) {
+            let el = document.getElementById('firebaseStatus');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'firebaseStatus';
+                el.className = 'text-xs px-3 py-2 text-center no-print';
+                const header = document.querySelector('header');
+                if (header) header.appendChild(el);
+            }
+            el.textContent = message;
+            el.className = 'text-xs px-3 py-2 text-center no-print ' +
+                (isError ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800');
+        }
+
+        async function initFirebase() {
+            const placeholders = ['GANTI_DENGAN_API_KEY_FIREBASE', 'GANTI_DENGAN_MESSAGING_SENDER_ID', 'GANTI_DENGAN_APP_ID'];
+            if (placeholders.some(v => Object.values(firebaseConfig).includes(v))) {
+                setFirebaseStatus('Firebase belum dikonfigurasi. Isi apiKey, messagingSenderId, dan appId dari Firebase Console.', true);
+                return;
+            }
+            try {
+                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                firebaseReady = true;
+                setFirebaseStatus('Menghubungkan ke Firebase…');
+
+                // Dokumen utama menyimpan seluruh daftar rak; dokumen kedua menyimpan riwayat.
+                const rackRef = db.collection('rackInventory').doc('current');
+                const historyRef = db.collection('rackInventory').doc('history');
+
+                const rackDoc = await rackRef.get();
+                if (!rackDoc.exists) {
+                    const localRack = JSON.parse(localStorage.getItem('materialRackDataCamV2'));
+                    await rackRef.set({ data: localRack || defaultRackData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                }
+                const historyDoc = await historyRef.get();
+                if (!historyDoc.exists) {
+                    const localHistory = JSON.parse(localStorage.getItem('materialRackHistoryCamV2')) || [];
+                    await historyRef.set({ data: localHistory, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                }
+
+                rackRef.onSnapshot(snapshot => {
+                    if (!snapshot.exists || !Array.isArray(snapshot.data().data)) return;
+                    isLoadingFromFirebase = true;
+                    rackData = snapshot.data().data;
+                    localStorage.setItem('materialRackDataCamV2', JSON.stringify(rackData));
+                    renderRackGrid();
+                    updateSelectedCount();
+                    if (activeCompartmentId !== null) {
+                        const active = rackData.find(r => r.id === activeCompartmentId);
+                        if (active) renderModalMaterialList(active);
+                    }
+                    isLoadingFromFirebase = false;
+                    setFirebaseStatus('Terhubung ke Firebase — data rak tersinkronisasi.');
+                }, error => {
+                    console.error('Gagal membaca data rak:', error);
+                    setFirebaseStatus('Gagal membaca data rak: ' + error.message, true);
+                });
+
+                historyRef.onSnapshot(snapshot => {
+                    if (!snapshot.exists || !Array.isArray(snapshot.data().data)) return;
+                    historyData = snapshot.data().data;
+                    localStorage.setItem('materialRackHistoryCamV2', JSON.stringify(historyData));
+                    renderHistoryTable();
+                }, error => {
+                    console.error('Gagal membaca riwayat:', error);
+                    setFirebaseStatus('Gagal membaca riwayat: ' + error.message, true);
+                });
+            } catch (error) {
+                console.error('Firebase init error:', error);
+                setFirebaseStatus('Koneksi Firebase gagal: ' + error.message, true);
+            }
+        }
 
         // Pagination State
         let currentPage = 1;
@@ -412,6 +503,7 @@
             renderHistoryTable();
             updateSelectedCount();
             lucide.createIcons();
+            initFirebase();
         });
 
         // Switch Tabs Function
@@ -439,13 +531,33 @@
             }
         }
 
-        // Save State to LocalStorage
-        function saveData() {
+        // Simpan ke cache browser dan Firestore.
+        async function saveData() {
             localStorage.setItem('materialRackDataCamV2', JSON.stringify(rackData));
             localStorage.setItem('materialRackHistoryCamV2', JSON.stringify(historyData));
             renderRackGrid();
             renderHistoryTable();
             updateSelectedCount();
+
+            if (isLoadingFromFirebase || !firebaseReady || !db) return;
+            try {
+                setFirebaseStatus('Menyimpan perubahan ke Firebase…');
+                await Promise.all([
+                    db.collection('rackInventory').doc('current').set({
+                        data: rackData,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }),
+                    db.collection('rackInventory').doc('history').set({
+                        data: historyData,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    })
+                ]);
+                setFirebaseStatus('Tersimpan di Firebase — data tersinkronisasi.');
+            } catch (error) {
+                console.error('Gagal menyimpan ke Firebase:', error);
+                setFirebaseStatus('Gagal menyimpan ke Firebase: ' + error.message, true);
+                alert('Data belum berhasil tersimpan di Firebase. Periksa koneksi dan Firestore Rules. Detail: ' + error.message);
+            }
         }
 
         // Add New Compartment
