@@ -92,6 +92,10 @@
                         <i data-lucide="plus-square" class="w-3.5 h-3.5"></i>
                         <span>Tambah</span>
                     </button>
+                    <button onclick="openStockInModal()" class="flex items-center justify-center gap-1 bg-sky-600 hover:bg-sky-500 text-white px-3 py-2 rounded-xl text-xs font-semibold transition shadow-sm whitespace-nowrap">
+                        <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                        <span>Barang Masuk</span>
+                    </button>
                     <button onclick="openStockOutModal()" class="flex items-center justify-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-xl text-xs font-semibold transition shadow-sm whitespace-nowrap">
                         <i data-lucide="minus-circle" class="w-3.5 h-3.5"></i>
                         <span>Pengeluaran</span>
@@ -175,7 +179,8 @@
                                 <th class="py-3 px-4 font-semibold">Waktu Transaksi</th>
                                 <th class="py-3 px-4 font-semibold">Lokasi Rak</th>
                                 <th class="py-3 px-4 font-semibold">Nama Material</th>
-                                <th class="py-3 px-4 font-semibold text-center">Jumlah Keluar</th>
+                                <th class="py-3 px-4 font-semibold text-center">Jenis Transaksi</th>
+                                <th class="py-3 px-4 font-semibold text-center">Jumlah</th>
                                 <th class="py-3 px-4 font-semibold">Keperluan / Keterangan</th>
                             </tr>
                         </thead>
@@ -264,7 +269,7 @@
                             </div>
                             <div>
                                 <label class="block text-[11px] font-semibold text-slate-500 mb-1">Nilai Kotak Pertama (Opsional)</label>
-                                <input type="number" id="addMaterialSubVal" min="0" value="" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                <input type="number" id="addMaterialSubVal" min="0" value="55" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                             </div>
                         </div>
                         <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1 shadow-sm">
@@ -293,6 +298,23 @@
                     Selesai
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal Barang Masuk -->
+    <div id="stockInModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-3 sm:p-4 no-print">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100">
+            <div class="bg-sky-700 text-white px-5 py-3.5 flex justify-between items-center">
+                <div class="flex items-center gap-2"><i data-lucide="package-plus" class="w-5 h-5"></i><h3 class="font-bold text-sm sm:text-base">Input Barang Masuk</h3></div>
+                <button type="button" onclick="closeStockInModal()" class="text-sky-100 hover:text-white p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form onsubmit="handleStockInSubmit(event)" class="p-4 sm:p-6 space-y-4">
+                <div><label class="block text-xs font-bold text-slate-700 uppercase mb-1">Lokasi Rak Tujuan</label><select id="stockInLocSelect" onchange="onStockInLocChange()" required class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-slate-50"></select></div>
+                <div><label class="block text-xs font-bold text-slate-700 uppercase mb-1">Pilih / Cari Material</label><input id="stockInItemName" list="stockInMaterialOptions" autocomplete="off" required type="text" placeholder="Ketik nama material, lalu pilih saran..." class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm"><datalist id="stockInMaterialOptions"></datalist><p class="text-[10px] text-slate-500 mt-1">Material yang pernah diinput di rak mana pun akan muncul otomatis. Bisa juga ketik nama material baru.</p></div>
+                <div><label class="block text-xs font-bold text-slate-700 uppercase mb-1">Jumlah Barang Masuk</label><input id="stockInQty" type="number" min="1" step="1" required value="1" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm"></div>
+                <div><label class="block text-xs font-bold text-slate-700 uppercase mb-1">Keterangan / Referensi</label><input id="stockInNote" type="text" placeholder="Contoh: Surat Jalan / PO / Supplier" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm"></div>
+                <div class="flex gap-2 pt-2"><button type="button" onclick="closeStockInModal()" class="w-1/3 bg-slate-100 text-slate-700 font-semibold py-2.5 rounded-xl text-xs">Batal</button><button type="submit" class="w-2/3 bg-sky-600 hover:bg-sky-700 text-white font-bold py-2.5 rounded-xl text-xs">Simpan Barang Masuk</button></div>
+            </form>
         </div>
     </div>
 
@@ -1009,6 +1031,87 @@
             alert(`Material berhasil dipindahkan ke ${target.locCode}.`);
         }
 
+        // Barang Masuk: menambah stok sekaligus mencatat riwayat transaksi.
+        function openStockInModal(preselectedLocCode = null) {
+            const locSelect = document.getElementById('stockInLocSelect');
+            locSelect.innerHTML = '';
+            rackData.forEach(comp => {
+                const opt = document.createElement('option');
+                opt.value = comp.locCode;
+                opt.textContent = `${comp.locCode} - ${comp.items.length} material`;
+                locSelect.appendChild(opt);
+            });
+            if (preselectedLocCode) locSelect.value = preselectedLocCode;
+            onStockInLocChange();
+            document.getElementById('stockInModal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeStockInModal() {
+            document.getElementById('stockInModal').classList.add('hidden');
+        }
+
+        function onStockInLocChange() {
+            // Tampilkan semua nama material unik dari seluruh rak sebagai saran autocomplete.
+            const input = document.getElementById('stockInItemName');
+            const datalist = document.getElementById('stockInMaterialOptions');
+            const previousValue = input ? input.value : '';
+            datalist.innerHTML = '';
+            const uniqueNames = new Map();
+            rackData.forEach(comp => (comp.items || []).forEach(item => {
+                const name = String(item.name || '').trim();
+                if (name && !uniqueNames.has(name.toLocaleLowerCase('id-ID'))) {
+                    uniqueNames.set(name.toLocaleLowerCase('id-ID'), name);
+                }
+            }));
+            [...uniqueNames.values()].sort((a, b) => a.localeCompare(b, 'id')).forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                datalist.appendChild(opt);
+            });
+            if (input) input.value = previousValue;
+        }
+
+        function handleStockInSubmit(event) {
+            event.preventDefault();
+            const locCode = document.getElementById('stockInLocSelect').value;
+            const materialName = document.getElementById('stockInItemName').value.trim();
+            const qty = Math.floor(Number(document.getElementById('stockInQty').value));
+            const note = document.getElementById('stockInNote').value.trim() || 'Barang masuk';
+            const comp = rackData.find(r => r.locCode === locCode);
+            if (!comp || !materialName || !Number.isFinite(qty) || qty < 1) {
+                alert('Pilih rak, isi nama material, dan jumlah masuk minimal 1.');
+                return;
+            }
+
+            // Jika nama material sudah ada di rak tujuan, tambah stoknya.
+            // Jika belum ada di rak tujuan (meski pernah ada di rak lain), buat entri material di rak tujuan.
+            let item = (comp.items || []).find(i => String(i.name || '').trim().toLocaleLowerCase('id-ID') === materialName.toLocaleLowerCase('id-ID'));
+            if (item) {
+                if (!Array.isArray(item.values)) item.values = [];
+                item.values.push(qty);
+            } else {
+                item = { id: 'item-' + Date.now(), name: materialName, values: [qty] };
+                if (!Array.isArray(comp.items)) comp.items = [];
+                comp.items.push(item);
+            }
+
+            historyData.unshift({
+                id: 'log-' + Date.now(),
+                time: new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }),
+                locCode: comp.locCode,
+                itemName: item.name,
+                qty,
+                type: 'Masuk',
+                note
+            });
+            saveData();
+            renderRackGrid();
+            renderHistoryTable();
+            closeStockInModal();
+            alert(`Barang masuk ${qty} unit ${item.name} berhasil dicatat di ${comp.locCode}.`);
+        }
+
         // Stock Out / Pengeluaran Workflow
         function openStockOutModal(preselectedLocCode = null) {
             const locSelect = document.getElementById('stockOutLocSelect');
@@ -1128,6 +1231,7 @@
                 locCode: comp.locCode,
                 itemName: item.name,
                 qty: qtyOut,
+                type: 'Keluar',
                 note: note
             };
 
@@ -1147,7 +1251,7 @@
             tbody.innerHTML = '';
 
             if (historyData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-400 text-xs italic">Belum ada riwayat pengeluaran material.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-400 text-xs italic">Belum ada riwayat transaksi material.</td></tr>`;
                 return;
             }
 
@@ -1158,7 +1262,8 @@
                     <td class="py-3 px-4 text-slate-500 text-xs whitespace-nowrap">${log.time}</td>
                     <td class="py-3 px-4 font-bold text-slate-800 text-xs">${log.locCode}</td>
                     <td class="py-3 px-4 text-slate-800 text-xs font-medium">${log.itemName}</td>
-                    <td class="py-3 px-4 text-center"><span class="bg-red-50 text-red-600 font-bold text-xs px-2.5 py-0.5 rounded-full">-${log.qty}</span></td>
+                    <td class="py-3 px-4 text-center"><span class="${log.type === 'Masuk' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'} font-bold text-xs px-2.5 py-0.5 rounded-full">${log.type || 'Keluar'}</span></td>
+                    <td class="py-3 px-4 text-center"><span class="${log.type === 'Masuk' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'} font-bold text-xs px-2.5 py-0.5 rounded-full">${log.type === 'Masuk' ? '+' : '-'}${log.qty}</span></td>
                     <td class="py-3 px-4 text-slate-500 text-xs">${log.note}</td>
                 `;
                 tbody.appendChild(tr);
